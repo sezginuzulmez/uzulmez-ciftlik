@@ -1,421 +1,251 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Üzülmez Çiftliği · Gelir/Gider</title>
-  <meta name="theme-color" content="#0b0b0b">
-  <style>
-    :root { --bg:#f6f7f9; --card:#ffffff; --text:#0b0b0b; --muted:#6b7280; --line:#e5e7eb; --accent:#0b0b0b; }
-    *{box-sizing:border-box} html,body{margin:0;padding:0;height:100%}
-    body{font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text)}
-    .wrap{max-width:920px;margin:0 auto;padding:16px 16px 96px}
-    header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:saturate(180%) blur(8px);border-bottom:1px solid var(--line)}
-    header .bar{max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
-    .btn{appearance:none;border:1px solid var(--line);padding:10px 14px;border-radius:14px;background:#fff;cursor:pointer}
-    .btn:active{transform:translateY(1px)}
-    .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-    .grid{display:grid;gap:12px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-    .card.p{padding:14px}
-    label{font-size:12px;color:var(--muted)}
-    input, select, textarea{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
-    input[type=\"checkbox\"]{width:auto;height:auto;margin:0 8px 0 0}
-    textarea{resize:vertical}
-    .row{display:flex;gap:12px;align-items:flex-end}
-    .row > div{flex:1}
-    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-    .stat{border:1px solid var(--line);border-radius:12px;padding:10px}
-    .stat .t{font-size:12px;color:var(--muted)} .stat .v{font-weight:600;margin-top:4px}
-    .list{display:grid;gap:12px}
-    .item{padding:12px;border:1px solid var(--line);border-radius:16px;background:#fff;display:flex;justify-content:space-between;gap:12px}
-    .pill{font-size:11px;border:1px solid #065f46;color:#065f46;border-radius:999px;padding:2px 8px}
-    .pill.unpaid{border-color:#92400e;color:#92400e}
-    .muted{color:var(--muted)}
-    nav.bottom{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line)}
-    nav.bottom .bar{max-width:920px;margin:0 auto;display:flex;gap:8px;padding:10px 12px}
-    nav.bottom .bar .btn{flex:1}
-    @media (max-width:720px){ .row{flex-direction:column} .stats{grid-template-columns:repeat(2,1fr)} }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Üzülmez Çiftlik – Gelir Gider</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+  <meta name="theme-color" content="#0ea5e9"/>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header>
-    <div class="bar">
-      <div style="font-weight:600">Üzülmez Çiftliği · Gelir/Gider</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn" id="exportBtn">Dışa Aktar (CSV)</button>
-        <label class="btn" for="importInput" style="cursor:pointer">İçe Aktar</label>
-        <input id="importInput" type="file" accept=".csv" style="display:none">
-      </div>
+    <h1>Üzülmez Çiftlik – Gelir &amp; Gider</h1>
+    <div class="row">
+      <span id="userBadge" class="userBadge"></span>
+      <button id="lockBtn" class="secondary">Kilitle</button>
+      <button id="installBtn" class="secondary">Uygulamayı Yükle</button>
     </div>
   </header>
 
-  <main class="wrap">
-    <section class="card p">
-      <form id="form" class="grid">
-        <div class="row">
-          <div>
-            <label>Ürün</label>
-            <input id="urun" placeholder="örn. Mısır silajı">
-          </div>
-          <div style="max-width:200px">
-            <label>Alış Tarihi</label>
-            <input id="alisTarihi" type="date">
-          </div>
+  <!-- AUTH SCREENS -->
+  <main id="authSetup" class="auth hidden">
+    <section class="card">
+      <h2>İlk Kurulum – Yönetici Oluştur</h2>
+      <p>Bu cihazda ilk kez açtınız. Bir <strong>Yönetici</strong> hesabı oluşturun.</p>
+      <form id="setupForm" class="grid">
+        <label>Ad / Kullanıcı adı
+          <input type="text" id="setupName" placeholder="örn. Sezgin" required>
+        </label>
+        <label>PIN (4–12 rakam)
+          <input type="password" id="setupPin" pattern="\d{4,12}" placeholder="örn. 1234" required>
+        </label>
+        <label>PIN Tekrar
+          <input type="password" id="setupPin2" pattern="\d{4,12}" placeholder="PIN tekrar" required>
+        </label>
+      </form>
+      <div class="row">
+        <button id="setupCreate">Yönetici Oluştur</button>
+      </div>
+    </section>
+  </main>
+
+  <main id="authLogin" class="auth hidden">
+    <section class="card">
+      <h2>Giriş Yap</h2>
+      <form id="loginForm" class="grid">
+        <label>Kullanıcı
+          <select id="loginUser"></select>
+        </label>
+        <label>PIN
+          <input type="password" id="loginPin" pattern="\d{4,12}" required>
+        </label>
+      </form>
+      <div class="row">
+        <button id="loginBtn">Giriş</button>
+        <small id="loginHint" class="muted"></small>
+      </div>
+    </section>
+  </main>
+
+  <!-- APP CONTENT -->
+  <main id="appMain" class="hidden">
+    <section class="card">
+      <h2>Yeni Kayıt</h2>
+      <form id="entryForm">
+        <div class="grid">
+          <label>Tür
+            <select id="type">
+              <option value="gider">Gider</option>
+              <option value="gelir">Gelir</option>
+            </select>
+          </label>
+
+          <label>Kategori
+            <select id="category">
+              <option value="Yem">Yem</option><option value="İlaç">İlaç</option><option value="Akaryakıt">Akaryakıt</option><option value="Elektrik">Elektrik</option><option value="İşçilik">İşçilik</option><option value="Bakım/Onarım">Bakım/Onarım</option><option value="Süt Satışı">Süt Satışı</option><option value="Hayvan Satışı">Hayvan Satışı</option><option value="Hayvan Alımı">Hayvan Alımı</option><option value="Gübre Satışı">Gübre Satışı</option><option value="Diğer">Diğer</option>
+            </select>
+          </label>
+
+          <label>Ürün
+            <select id="productSelect">
+              <option value="Saman">Saman</option><option value="Silaj">Silaj</option><option value="Posa">Posa</option><option value="Çöğenler Süt">Çöğenler Süt</option><option value="Süt">Süt</option><option value="Tariş Süt">Tariş Süt</option><option value="Ödemiş Süt">Ödemiş Süt</option><option value="Gebe Yemi">Gebe Yemi</option><option value="Düve Yemi">Düve Yemi</option><option value="Arpa">Arpa</option><option value="Mısır">Mısır</option><option value="Soya">Soya</option><option value="Bypass Yağı">Bypass Yağı</option><option value="Toksin Bağlayıcı">Toksin Bağlayıcı</option><option value="Buffer">Buffer</option><option value="Soda">Soda</option><option value="Diğer">Diğer</option>
+            </select>
+          </label>
+
+          <label>Ürün (Diğer/Açıklama)
+            <input type="text" id="productOther" placeholder="Serbest metin" disabled />
+          </label>
+
+          <label>Alış Tarihi
+            <input type="date" id="purchaseDate" value="2025-11-03" required />
+          </label>
+
+          <label>Ödeme Tarihi
+            <input type="date" id="paymentDate" />
+          </label>
+
+          <label>Birim
+            <select id="unit">
+              <option value="kg" selected>kg</option><option value="ton" >ton</option><option value="balya" >balya</option><option value="çuval" >çuval</option><option value="litre" >litre</option><option value="adet" >adet</option>
+            </select>
+          </label>
+
+          <label>Miktar
+            <input type="number" step="0.01" id="quantity" placeholder="örn. 130" />
+          </label>
+
+          <label>Birim Fiyat (TL)
+            <input type="number" step="0.01" id="unitPrice" placeholder="örn. 12.50" />
+          </label>
+
+          <label>Toplam Tutar (TL)
+            <input type="number" step="0.01" id="totalPrice" placeholder="otomatik hesaplanır" disabled />
+          </label>
+
+          <label>Ödenen (TL)
+            <input type="number" step="0.01" id="paidAmount" placeholder="örn. 5000" />
+          </label>
+
+          <label>Kalan (TL)
+            <input type="number" step="0.01" id="remainingAmount" placeholder="otomatik hesaplanır" disabled />
+          </label>
+        </div>
+
+        <div class="row wrap" style="margin-top:10px;">
+          <span class="muted">Hızlı Şablonlar:</span>
+          <button type="button" class="chip" id="tplSilaj">Silaj Alımı</button>
+          <button type="button" class="chip" id="tplSut">Süt Satışı</button>
+          <button type="button" class="chip" id="tplAkaryakit">Akaryakıt Alımı</button>
+          <button type="button" class="chip" id="tplIlac">İlaç Alımı</button>
+          <button type="button" class="chip" id="tplBakimTraktor">Bakım/Onarım – Traktör</button>
         </div>
 
         <div class="row">
-          <div>
-            <label>Birim (₺/kg)</label>
-            <input id="birimTutar" type="number" step="0.01" inputmode="decimal" placeholder="0,00">
-          </div>
-          <div>
-            <label>KG</label>
-            <input id="kg" type="number" step="0.01" inputmode="decimal" placeholder="0">
-          </div>
-          <div>
-            <label>Toplam (oto)</label>
-            <input id="toplamTutar" readonly>
-          </div>
-        </div>
-
-        <div class="row">
-          <div>
-            <label>Ödeme Tarihi (ops)</label>
-            <input id="odemeTarihi" type="date">
-          </div>
-          <div>
-            <label>Tedarikçi (ops)</label>
-            <input id="tedarikci" placeholder="örn. ABC Yem">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input id="odendi" type="checkbox">
-            <label for="odendi">Ödendi</label>
-          </div>
-        </div>
-
-        <div>
-          <label>Not (ops)</label>
-          <textarea id="not" rows="2" placeholder="Açıklama"></textarea>
-        </div>
-
-        <div style="display:flex;gap:10px">
-          <button class="btn primary" type="submit" id="submitBtn">Kaydı Ekle</button>
-          <button class="btn" type="button" id="cancelBtn" style="display:none">Vazgeç</button>
+          <button type="submit" id="addBtn">Kaydı Ekle</button>
+          <button type="reset" class="secondary">Temizle</button>
         </div>
       </form>
     </section>
 
-    <section class="grid" style="margin-top:12px">
-      <div class="card p">
-        <div class="row" style="align-items:flex-end">
-          <div>
-            <label>Ara</label>
-            <input id="q" placeholder="ürün / tedarikçi / not">
-          </div>
-          <div style="max-width:200px">
-            <label>Durum</label>
-            <select id="status">
-              <option value="all">Hepsi</option>
-              <option value="paid">Ödenen</option>
-              <option value="unpaid">Ödenmeyen</option>
-            </select>
-          </div>
-          <div style="max-width:200px">
-            <label>Tarih (başlangıç)</label>
-            <input id="dateFrom" type="date">
-          </div>
-          <div style="max-width:200px">
-            <label>Tarih (bitiş)</label>
-            <input id="dateTo" type="date">
-          </div>
-        </div>
-        <div class="stats" style="margin-top:12px">
-          <div class="stat"><div class="t">Kayıt</div><div class="v" id="sCount">0</div></div>
-          <div class="stat"><div class="t">Toplam KG</div><div class="v" id="sKg">0</div></div>
-          <div class="stat"><div class="t">Toplam Tutar</div><div class="v" id="sTotal">₺0,00</div></div>
-          <div class="stat"><div class="t">Ödenmeyen</div><div class="v" id="sUnpaid">₺0,00</div></div>
-        </div>
+    <section class="card">
+      <h2>Özet & Grafikler</h2>
+      <div class="summary">
+        <div><strong>Toplam Gelir:</strong> <span id="sumIncome">0</span> TL</div>
+        <div><strong>Toplam Gider:</strong> <span id="sumExpense">0</span> TL</div>
+        <div><strong>Net:</strong> <span id="sumNet">0</span> TL</div>
+        <div><strong>Toplam Kalan (borç):</strong> <span id="sumRemaining">0</span> TL</div>
+      </div>
+      <div class="charts">
+        <canvas id="chartMonthly" height="140"></canvas>
+        <canvas id="chartCategory" height="140"></canvas>
       </div>
     </section>
 
-    <section style="margin-top:12px">
-      <div id="empty" class="muted" style="text-align:center;padding:12px;display:none">Henüz kayıt yok veya filtreye uyan sonuç bulunamadı.</div>
-      <ul id="list" class="list"></ul>
+    <section class="card">
+      <h2>Kayıtlar</h2>
+      <div class="row wrap">
+        <input type="search" id="search" placeholder="Ara (ürün, tür, tarih, kategori)">
+        <select id="filterType">
+          <option value="hepsi">Hepsi</option>
+          <option value="gelir">Gelir</option>
+          <option value="gider">Gider</option>
+        </select>
+        <div class="chipbar">
+          <button id="fltAll" class="chip chipOn">Tümü</button>
+          <button id="fltYemGider" class="chip">Yem Giderleri</button>
+          <button id="fltSutSatis" class="chip">Süt Satışları</button>
+          <button id="fltGelir" class="chip">Gelirler</button>
+          <button id="fltGider" class="chip">Giderler</button>
+          <button id="fltOverdue" class="chip">Vadesi Geçen</button>
+        </div>
+        <button id="exportCsv" class="secondary">CSV Dışa Aktar</button>
+        <button id="exportJson" class="secondary">JSON Dışa Aktar</button>
+        <label class="fileLabel">
+          JSON İçe Aktar
+          <input type="file" id="importJson" accept="application/json" hidden>
+        </label>
+        <button id="clearAll" class="danger">Tümünü Sil</button>
+      </div>
+
+      <div class="tableWrap">
+        <table id="recordsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tür</th>
+              <th>Kategori</th>
+              <th>Ürün</th>
+              <th>Alış Tarihi</th>
+              <th>Ödeme</th>
+              <th>Birim</th>
+              <th>Miktar</th>
+              <th>Birim Fiyat</th>
+              <th>Toplam</th>
+              <th>Ödenen</th>
+              <th>Kalan</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- USER MANAGEMENT (Admin only) -->
+    <section class="card" id="userMgmt" style="display:none;">
+      <h2>Kullanıcı Yönetimi</h2>
+      <p class="muted">Yalnızca Yönetici. Kullanıcı ekle/sil, PIN sıfırla.</p>
+      <div class="grid">
+        <label>Ad / Kullanıcı adı
+          <input type="text" id="newUserName" placeholder="örn. Personel 1">
+        </label>
+        <label>Rol
+          <select id="newUserRole">
+            <option value="personel">Personel (görüntüleme)</option>
+            <option value="admin">Yönetici</option>
+          </select>
+        </label>
+        <label>PIN (4–12 rakam)
+          <input type="password" id="newUserPin" pattern="\d{4,12}">
+        </label>
+      </div>
+      <div class="row">
+        <button id="addUserBtn">Kullanıcı Ekle</button>
+      </div>
+
+      <div class="tableWrap" style="margin-top:12px;">
+        <table id="usersTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ad</th>
+              <th>Rol</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
   </main>
 
-  <nav class="bottom">
-    <div class="bar">
-      <button class="btn" id="fAll">Hepsi</button>
-      <button class="btn" id="fUnpaid">Ödenmeyen</button>
-      <button class="btn" id="fPaid">Ödenen</button>
-      <button class="btn" id="toTop">Yeni Kayıt</button>
-    </div>
-  </nav>
+  <footer>
+    <small>Veriler cihazınızda (offline) saklanır. – © Üzülmez Çiftlik</small>
+  </footer>
 
-  <script>
-  const STORAGE_KEY = "uzulmez_ciftlik_gelir_gider_v2";
-  const $ = (id) => document.getElementById(id);
-
-  const state = {
-    items: [],
-    editingId: null,
-    filters: { q:"", status:"all", dateFrom:"", dateTo:"" }
-  };
-
-  const fmtTRY = (n) => {
-    const num = isFinite(Number(n)) ? Number(n) : 0;
-    return new Intl.NumberFormat("tr-TR", { style:"currency", currency:"TRY", maximumFractionDigits: 2 }).format(num);
-  };
-
-  function uid(){ return 'id-' + Math.random().toString(36).slice(2) + Date.now(); }
-
-  function load(){
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw) state.items = JSON.parse(raw);
-    } catch(e){}
-  }
-  function save(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items)); } catch(e){}
-  }
-
-  function render(){
-    const q = state.filters.q.toLowerCase();
-    const status = state.filters.status;
-    const df = state.filters.dateFrom;
-    const dt = state.filters.dateTo;
-
-    const filtered = state.items.filter(it => {
-      const text = (it.urun + ' ' + (it.tedarikci||'') + ' ' + (it.not||'')).toLowerCase();
-      if(q && !text.includes(q)) return false;
-      if(status==='paid' && !it.odendi) return false;
-      if(status==='unpaid' && it.odendi) return false;
-      if(df && it.alisTarihi < df) return false;
-      if(dt && it.alisTarihi > dt) return false;
-      return true;
-    });
-
-    const count = filtered.length;
-    const kg = filtered.reduce((s,x)=>s+(x.kg||0),0);
-    const total = filtered.reduce((s,x)=>s+(x.toplamTutar||0),0);
-    const paid = filtered.filter(x=>x.odendi).reduce((s,x)=>s+(x.toplamTutar||0),0);
-    const unpaid = total - paid;
-    $('sCount').textContent = String(count);
-    $('sKg').textContent = kg.toFixed(2);
-    $('sTotal').textContent = fmtTRY(total);
-    $('sUnpaid').textContent = fmtTRY(unpaid);
-
-    const list = $('list');
-    list.innerHTML = '';
-    $('empty').style.display = filtered.length===0 ? 'block' : 'none';
-
-    filtered.forEach(it => {
-      const li = document.createElement('li');
-      li.className = 'item';
-      li.innerHTML = `
-        <div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <div style="font-weight:600">${escapeHtml(it.urun)}</div>
-            <span class="pill ${it.odendi? '':'unpaid'}">${it.odendi? 'Ödendi':'Ödenmeyen'}</span>
-          </div>
-          <div class="muted" style="margin-top:4px;font-size:14px">
-            Alış: <b>${it.alisTarihi||''}</b> · KG: <b>${it.kg}</b> · Birim: <b>${fmtTRY(it.birimTutar)}</b>
-          </div>
-          <div style="margin-top:4px">Toplam: <b>${fmtTRY(it.toplamTutar)}</b></div>
-          ${(it.tedarikci||it.odemeTarihi)?
-            `<div class="muted" style="margin-top:4px;font-size:12px">
-              ${it.tedarikci? `Tedarikçi: <b>${escapeHtml(it.tedarikci)}</b> · `:''}
-              ${it.odemeTarihi? `Ödeme: <b>${it.odemeTarihi}</b>`:''}
-            </div>`:''}
-          ${it.not? `<div class="muted" style="margin-top:4px;font-size:12px">Not: ${escapeHtml(it.not)}</div>`:''}
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn" data-edit="${it.id}">Düzenle</button>
-          <button class="btn" data-del="${it.id}">Sil</button>
-        </div>
-      `;
-      list.appendChild(li);
-    });
-
-    list.querySelectorAll('[data-edit]').forEach(b=> b.onclick = () => startEdit(b.getAttribute('data-edit')));
-    list.querySelectorAll('[data-del]').forEach(b=> b.onclick = () => delItem(b.getAttribute('data-del')));
-  }
-
-  function startEdit(id){
-    const it = state.items.find(x=>x.id===id);
-    if(!it) return;
-    state.editingId = id;
-    $('urun').value = it.urun||'';
-    $('alisTarihi').value = it.alisTarihi||'';
-    $('birimTutar').value = it.birimTutar??'';
-    $('kg').value = it.kg??'';
-    $('toplamTutar').value = (it.toplamTutar??0).toFixed(2);
-    $('odemeTarihi').value = it.odemeTarihi||'';
-    $('tedarikci').value = it.tedarikci||'';
-    $('odendi').checked = !!it.odendi;
-    $('not').value = it.not||'';
-    $('submitBtn').textContent = 'Kaydı Güncelle';
-    $('cancelBtn').style.display = '';
-    window.scrollTo({top:0,behavior:'smooth'});
-  }
-
-  function delItem(id){
-    if(!confirm('Silinsin mi?')) return;
-    state.items = state.items.filter(x=>x.id!==id);
-    save(); render();
-  }
-
-  function resetForm(){
-    state.editingId = null;
-    $('urun').value = '';
-    $('alisTarihi').value = new Date().toISOString().slice(0,10);
-    $('birimTutar').value = '';
-    $('kg').value = '';
-    $('toplamTutar').value = '';
-    $('odemeTarihi').value = '';
-    $('tedarikci').value = '';
-    $('odendi').checked = false;
-    $('not').value = '';
-    $('submitBtn').textContent = 'Kaydı Ekle';
-    $('cancelBtn').style.display = 'none';
-  }
-
-  function recalc(){
-    const b = parseFloat($('birimTutar').value || 0);
-    const k = parseFloat($('kg').value || 0);
-    const t = (b*k) || 0;
-    $('toplamTutar').value = t ? t.toFixed(2) : '';
-  }
-
-  function onSubmit(e){
-    e.preventDefault();
-    const urun = $('urun').value.trim();
-    const alisTarihi = $('alisTarihi').value;
-    if(!urun){ alert('Lütfen ürün adını girin.'); return; }
-    if(!alisTarihi){ alert('Alış tarihini seçin.'); return; }
-
-    const record = {
-      id: state.editingId || uid(),
-      urun,
-      alisTarihi,
-      birimTutar: parseFloat($('birimTutar').value || 0),
-      kg: parseFloat($('kg').value || 0),
-      toplamTutar: parseFloat($('toplamTutar').value || 0),
-      odemeTarihi: $('odemeTarihi').value || '',
-      tedarikci: $('tedarikci').value || '',
-      odendi: $('odendi').checked,
-      not: $('not').value || '',
-      createdAt: state.editingId ? (state.items.find(i=>i.id===state.editingId)?.createdAt) : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if(state.editingId){
-      state.items = state.items.map(x=> x.id===state.editingId ? record : x);
-    } else {
-      state.items = [record, ...state.items];
-    }
-    save(); resetForm(); render();
-  }
-
-  function exportCSV(){
-    const headers = ['id','urun','alisTarihi','birimTutar','kg','toplamTutar','odemeTarihi','tedarikci','odendi','not','createdAt','updatedAt'];
-    const rows = [headers.join(',')];
-    state.items.forEach(it=>{
-      rows.push([
-        it.id, csv(it.urun), it.alisTarihi, it.birimTutar, it.kg, it.toplamTutar, it.odemeTarihi||'',
-        csv(it.tedarikci||''), it.odendi?1:0, csv(it.not||''), it.createdAt||'', it.updatedAt||''
-      ].join(','));
-    });
-    const blob = new Blob(['\uFEFF' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='uzulmez-ciftlik-kayitlar.csv'; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function importCSV(file){
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      const text = String(e.target.result||'');
-      const lines = text.split(/\\r?\\n/).filter(Boolean);
-      if(!lines.length){ alert('Boş dosya'); return; }
-      const head = lines[0].split(',').map(h=>h.trim());
-      const idx = Object.fromEntries(head.map((h,i)=>[h,i]));
-      const body = lines.slice(1);
-      const parsed = body.map(line=>{
-        const cols = parseCSV(line);
-        return {
-          id: cols[idx.id] || uid(),
-          urun: unquote(cols[idx.urun]||''),
-          alisTarihi: cols[idx.alisTarihi]||'',
-          birimTutar: parseFloat(cols[idx.birimTutar]||0),
-          kg: parseFloat(cols[idx.kg]||0),
-          toplamTutar: parseFloat(cols[idx.toplamTutar]||0),
-          odemeTarihi: cols[idx.odemeTarihi]||'',
-          tedarikci: unquote(cols[idx.tedarikci]||''),
-          odendi: (cols[idx.odendi]||'0').toString().trim()==='1',
-          not: unquote(cols[idx.not]||''),
-          createdAt: cols[idx.createdAt]||new Date().toISOString(),
-          updatedAt: cols[idx.updatedAt]||new Date().toISOString(),
-        };
-      });
-      const others = state.items.filter(x=> !parsed.some(p=>p.id===x.id));
-      state.items = parsed.concat(others);
-      save(); render();
-    };
-    reader.readAsText(file, 'utf-8');
-  }
-
-  function csv(s){
-    const str = String(s??'');
-    if(str.includes(',') || str.includes('\"') || str.includes('\\n')){
-      return '\"' + str.replaceAll('\"','\"\"') + '\"';
-    }
-    return str;
-  }
-  function unquote(s){
-    const t = String(s||'').trim();
-    if(t.startsWith('\"') && t.endsWith('\"')) return t.slice(1,-1).replaceAll('\"\"','\"');
-    return t;
-  }
-  function parseCSV(line){
-    const out=[]; let cur=\"\"; let q=false;
-    for(let i=0;i<line.length;i++){
-      const ch = line[i];
-      if(q){
-        if(ch==='\"' && line[i+1]==='\"'){ cur+='\"'; i++; }
-        else if(ch==='\"'){ q=false; }
-        else { cur+=ch; }
-      }else{
-        if(ch==='\"'){ q=true; }
-        else if(ch===','){ out.push(cur); cur=''; }
-        else { cur+=ch; }
-      }
-    }
-    out.push(cur); return out;
-  }
-  function escapeHtml(s){
-    return String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));
-  }
-
-  $('form').addEventListener('submit', onSubmit);
-  $('cancelBtn').onclick = resetForm;
-  $('birimTutar').oninput = recalc;
-  $('kg').oninput = recalc;
-  $('exportBtn').onclick = exportCSV;
-  $('importInput').addEventListener('change', e=> importCSV(e.target.files?.[0]));
-  $('q').oninput = (e)=>{ state.filters.q = e.target.value; render(); };
-  $('status').onchange = (e)=>{ state.filters.status = e.target.value; render(); };
-  $('dateFrom').onchange = (e)=>{ state.filters.dateFrom = e.target.value; render(); };
-  $('dateTo').onchange = (e)=>{ state.filters.dateTo = e.target.value; render(); };
-  $('fAll').onclick = ()=>{ state.filters.status='all'; $('status').value='all'; render(); };
-  $('fUnpaid').onclick = ()=>{ state.filters.status='unpaid'; $('status').value='unpaid'; render(); };
-  $('fPaid').onclick = ()=>{ state.filters.status='paid'; $('status').value='paid'; render(); };
-  $('toTop').onclick = ()=> window.scrollTo({top:0,behavior:'smooth'});
-
-  load(); resetForm(); render();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
