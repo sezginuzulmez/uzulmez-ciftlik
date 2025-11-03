@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Üzülmez Çiftliği · Gelir/Gider</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 & ReactDOM via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <meta name="theme-color" content="#000000"/>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+  <script type="text/javascript">
+  // == App Code (converted to plain script) ==
+  const { useEffect, useMemo, useState } = React;
+
+  const fmtTRY = (n) =>
+    new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 })
+      .format(isFinite(Number(n)) ? Number(n) : 0);
+
+  const STORAGE_KEY = "uzulmez_ciftlik_gelir_gider_v1";
+
+  function App() {
+    const [items, setItems] = useState([]);
+    const [editingId, setEditingId] = useState(null);
+    const [q, setQ] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+
+    const emptyForm = {
+      urun: "",
+      alisTarihi: new Date().toISOString().slice(0, 10),
+      birimTutar: "",
+      kg: "",
+      toplamTutar: "",
+      odemeTarihi: "",
+      tedarikci: "",
+      odendi: false,
+      not: "",
+    };
+    const [form, setForm] = useState(emptyForm);
+
+    useEffect(() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) setItems(JSON.parse(raw));
+      } catch (e) {}
+    }, []);
+    useEffect(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      } catch (e) {}
+    }, [items]);
+
+    useEffect(() => {
+      const { birimTutar, kg } = form;
+      const t = (parseFloat(birimTutar) || 0) * (parseFloat(kg) || 0);
+      setForm((f) => ({ ...f, toplamTutar: t ? t.toFixed(2) : "" }));
+    }, [form.birimTutar, form.kg]);
+
+    function resetForm() {
+      setForm(emptyForm);
+      setEditingId(null);
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      if (!form.urun.trim()) return alert("Lütfen ürün adını girin.");
+      if (!form.alisTarihi) return alert("Alış tarihini seçin.");
+
+      const record = {
+        id: editingId ?? (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        ...form,
+        birimTutar: parseFloat(form.birimTutar || 0),
+        kg: parseFloat(form.kg || 0),
+        toplamTutar: parseFloat(form.toplamTutar || 0),
+        createdAt: editingId ? (items.find((i) => i.id === editingId)?.createdAt) : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (editingId) {
+        setItems((arr) => arr.map((x) => (x.id === editingId ? record : x)));
+      } else {
+        setItems((arr) => [record, ...arr]);
+      }
+      resetForm();
+    }
+
+    function onEdit(it) {
+      setEditingId(it.id);
+      setForm({
+        urun: it.urun || "",
+        alisTarihi: it.alisTarihi || "",
+        birimTutar: it.birimTutar?.toString() ?? "",
+        kg: it.kg?.toString() ?? "",
+        toplamTutar: (it.toplamTutar ?? 0).toFixed(2),
+        odemeTarihi: it.odemeTarihi || "",
+        tedarikci: it.tedarikci || "",
+        odendi: !!it.odendi,
+        not: it.not || "",
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function onDelete(id) {
+      if (confirm("Silinsin mi?")) setItems((arr) => arr.filter((x) => x.id !== id));
+    }
+
+    const filtered = useMemo(() => {
+      return items.filter((it) => {
+        const text = \`\${it.urun} \${it.tedarikci} \${it.not}\`.toLowerCase();
+        if (q && !text.includes(q.toLowerCase())) return false;
+        if (statusFilter === "paid" && !it.odendi) return false;
+        if (statusFilter === "unpaid" && it.odendi) return false;
+        if (dateFrom && it.alisTarihi < dateFrom) return false;
+        if (dateTo && it.alisTarihi > dateTo) return false;
+        return true;
+      });
+    }, [items, q, statusFilter, dateFrom, dateTo]);
+
+    const summary = useMemo(() => {
+      const count = filtered.length;
+      const kg = filtered.reduce((s, x) => s + (x.kg || 0), 0);
+      const total = filtered.reduce((s, x) => s + (x.toplamTutar || 0), 0);
+      const paid = filtered.filter((x) => x.odendi).reduce((s, x) => s + (x.toplamTutar || 0), 0);
+      const unpaid = total - paid;
+      return { count, kg, total, paid, unpaid };
+    }, [filtered]);
+
+    function exportCSV() {
+      const headers = [
+        "id","urun","alisTarihi","birimTutar","kg","toplamTutar","odemeTarihi","tedarikci","odendi","not","createdAt","updatedAt"
+      ];
+      const rows = [headers.join(",")].concat(
+        items.map((it) =>
+          [
+            it.id,
+            safeCSV(it.urun),
+            it.alisTarihi,
+            it.birimTutar,
+            it.kg,
+            it.toplamTutar,
+            it.odemeTarihi || "",
+            safeCSV(it.tedarikci || ""),
+            it.odendi ? 1 : 0,
+            safeCSV(it.not || ""),
+            it.createdAt || "",
+            it.updatedAt || "",
+          ].join(",")
+        )
+      );
+      const blob = new Blob(["\\uFEFF" + rows.join("\\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "uzulmez-ciftlik-kayitlar.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importCSV(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result?.toString() || "";
+        const lines = text.split(/\\r?\\n/).filter(Boolean);
+        if (!lines.length) return alert("Boş dosya");
+        const head = lines[0].split(",").map((h) => h.trim());
+        const body = lines.slice(1);
+        const idx = Object.fromEntries(head.map((h, i) => [h, i]));
+        const parsed = body.map((line) => {
+          const cols = splitCSV(line);
+          return {
+            id: cols[idx.id] || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())),
+            urun: unquote(cols[idx.urun] || ""),
+            alisTarihi: cols[idx.alisTarihi] || "",
+            birimTutar: parseFloat(cols[idx.birimTutar] || 0),
+            kg: parseFloat(cols[idx.kg] || 0),
+            toplamTutar: parseFloat(cols[idx.toplamTutar] || 0),
+            odemeTarihi: cols[idx.odemeTarihi] || "",
+            tedarikci: unquote(cols[idx.tedarikci] || ""),
+            odendi: (cols[idx.odendi] || "0").toString().trim() === "1",
+            not: unquote(cols[idx.not] || ""),
+            createdAt: cols[idx.createdAt] || new Date().toISOString(),
+            updatedAt: cols[idx.updatedAt] || new Date().toISOString(),
+          };
+        });
+        setItems(parsed.concat(items.filter((x) => !parsed.some((p) => p.id === x.id))));
+      };
+      reader.readAsText(file, "utf-8");
+    }
+
+    return (
+      React.createElement("div", { className: "min-h-screen bg-gray-50 pb-24" },
+        React.createElement("header", { className: "sticky top-0 z-30 backdrop-blur bg-white/90 border-b border-gray-200" },
+          React.createElement("div", { className: "max-w-3xl mx-auto px-4 py-3 flex items-center justify-between" },
+            React.createElement("h1", { className: "text-lg font-semibold" }, "Üzülmez Çiftliği · Gelir/Gider"),
+            React.createElement("div", { className: "flex items-center gap-2" },
+              React.createElement("button", { onClick: exportCSV, className: "px-3 py-1.5 rounded-xl border shadow-sm text-sm" }, "Dışa Aktar (CSV)"),
+              React.createElement("label", { className: "px-3 py-1.5 rounded-xl border shadow-sm text-sm cursor-pointer" }, 
+                "İçe Aktar",
+                React.createElement("input", { type: "file", accept: ".csv", className: "hidden", onChange: (e) => importCSV(e.target.files?.[0]) })
+              )
+            )
+          )
+        ),
+        React.createElement("main", { className: "max-w-3xl mx-auto px-4 py-4" },
+          React.createElement("form", { onSubmit: handleSubmit, className: "bg-white rounded-2xl shadow p-4 grid grid-cols-1 gap-3" },
+            React.createElement("div", { className: "flex items-end gap-2" },
+              React.createElement("div", { className: "flex-1" },
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Ürün"),
+                React.createElement("input", {
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  placeholder: "örn. Mısır silajı",
+                  value: form.urun,
+                  onChange: (e) => setForm({ ...form, urun: e.target.value }),
+                })
+              ),
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Alış Tarihi"),
+                React.createElement("input", {
+                  type: "date",
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  value: form.alisTarihi,
+                  onChange: (e) => setForm({ ...form, alisTarihi: e.target.value }),
+                })
+              )
+            ),
+            React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Birim (₺/kg)"),
+                React.createElement("input", {
+                  type: "number", step: "0.01", inputMode: "decimal",
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  placeholder: "0,00",
+                  value: form.birimTutar,
+                  onChange: (e) => setForm({ ...form, birimTutar: e.target.value }),
+                })
+              ),
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "KG"),
+                React.createElement("input", {
+                  type: "number", step: "0.01", inputMode: "decimal",
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  placeholder: "0",
+                  value: form.kg,
+                  onChange: (e) => setForm({ ...form, kg: e.target.value }),
+                })
+              ),
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Toplam (oto)"),
+                React.createElement("input", { className: "w-full mt-1 px-3 py-2 rounded-xl border bg-gray-50", value: form.toplamTutar, readOnly: true })
+              )
+            ),
+            React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Ödeme Tarihi (ops)"),
+                React.createElement("input", {
+                  type: "date",
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  value: form.odemeTarihi,
+                  onChange: (e) => setForm({ ...form, odemeTarihi: e.target.value }),
+                })
+              ),
+              React.createElement("div", null,
+                React.createElement("label", { className: "text-sm text-gray-600" }, "Tedarikçi (ops)"),
+                React.createElement("input", {
+                  className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                  placeholder: "örn. ABC Yem",
+                  value: form.tedarikci,
+                  onChange: (e) => setForm({ ...form, tedarikci: e.target.value }),
+                })
+              ),
+              React.createElement("div", { className: "flex items-center gap-2 mt-6" },
+                React.createElement("input", {
+                  id: "odendi", type: "checkbox", className: "w-5 h-5",
+                  checked: form.odendi,
+                  onChange: (e) => setForm({ ...form, odendi: e.target.checked }),
+                }),
+                React.createElement("label", { htmlFor: "odendi", className: "text-sm text-gray-700" }, "Ödendi")
+              )
+            ),
+            React.createElement("div", null,
+              React.createElement("label", { className: "text-sm text-gray-600" }, "Not (ops)"),
+              React.createElement("textarea", {
+                className: "w-full mt-1 px-3 py-2 rounded-xl border", rows: 2, placeholder: "Açıklama",
+                value: form.not, onChange: (e) => setForm({ ...form, not: e.target.value }),
+              })
+            ),
+            React.createElement("div", { className: "flex items-center gap-2" },
+              React.createElement("button", { className: "px-4 py-2 rounded-2xl bg-black text-white" }, editingId ? "Kaydı Güncelle" : "Kaydı Ekle"),
+              editingId && React.createElement("button", { type: "button", onClick: resetForm, className: "px-4 py-2 rounded-2xl border" }, "Vazgeç")
+            )
+          ),
+          React.createElement("section", { className: "mt-4 grid grid-cols-1 gap-3" },
+            React.createElement("div", { className: "bg-white rounded-2xl shadow p-3" },
+              React.createElement("div", { className: "flex flex-wrap items-end gap-2" },
+                React.createElement("div", { className: "flex-1 min-w-[160px]" },
+                  React.createElement("label", { className: "text-sm text-gray-600" }, "Ara"),
+                  React.createElement("input", {
+                    className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                    placeholder: "ürün / tedarikçi / not",
+                    value: q, onChange: (e) => setQ(e.target.value),
+                  })
+                ),
+                React.createElement("div", null,
+                  React.createElement("label", { className: "text-sm text-gray-600" }, "Durum"),
+                  React.createElement("select", {
+                    className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                    value: statusFilter, onChange: (e) => setStatusFilter(e.target.value),
+                  },
+                    React.createElement("option", { value: "all" }, "Hepsi"),
+                    React.createElement("option", { value: "paid" }, "Ödenen"),
+                    React.createElement("option", { value: "unpaid" }, "Ödenmeyen"),
+                  )
+                ),
+                React.createElement("div", null,
+                  React.createElement("label", { className: "text-sm text-gray-600" }, "Tarih (başlangıç)"),
+                  React.createElement("input", {
+                    type: "date",
+                    className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                    value: dateFrom, onChange: (e) => setDateFrom(e.target.value),
+                  })
+                ),
+                React.createElement("div", null,
+                  React.createElement("label", { className: "text-sm text-gray-600" }, "Tarih (bitiş)"),
+                  React.createElement("input", {
+                    type: "date",
+                    className: "w-full mt-1 px-3 py-2 rounded-xl border",
+                    value: dateTo, onChange: (e) => setDateTo(e.target.value),
+                  })
+                )
+              ),
+              React.createElement("div", { className: "mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2" },
+                React.createElement(Stat, { title: "Kayıt", value: String(summary.count) }),
+                React.createElement(Stat, { title: "Toplam KG", value: summary.kg.toFixed(2) }),
+                React.createElement(Stat, { title: "Toplam Tutar", value: fmtTRY(summary.total) }),
+                React.createElement(Stat, { title: "Ödenmeyen", value: fmtTRY(summary.unpaid) }),
+              )
+            )
+          ),
+          React.createElement("section", { className: "mt-4" },
+            filtered.length === 0
+              ? React.createElement("p", { className: "text-center text-gray-500" }, "Henüz kayıt yok veya filtreye uyan sonuç bulunamadı.")
+              : React.createElement("ul", { className: "grid grid-cols-1 gap-3" },
+                  filtered.map((it) => React.createElement("li", { key: it.id, className: "bg-white rounded-2xl shadow p-3" },
+                    React.createElement("div", { className: "flex items-start justify-between gap-3" },
+                      React.createElement("div", null,
+                        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                          React.createElement("h3", { className: "font-semibold text-base" }, it.urun),
+                          React.createElement("span", { className: \`text-xs px-2 py-0.5 rounded-full border \${it.odendi ? "border-green-600 text-green-700" : "border-amber-600 text-amber-700"}\` },
+                            it.odendi ? "Ödendi" : "Ödenmeyen"
+                          )
+                        ),
+                        React.createElement("p", { className: "text-sm text-gray-600 mt-0.5" },
+                          "Alış: ", React.createElement("b", null, it.alisTarihi),
+                          " · KG: ", React.createElement("b", null, it.kg),
+                          " · Birim: ", React.createElement("b", null, fmtTRY(it.birimTutar))
+                        ),
+                        React.createElement("p", { className: "text-sm mt-1" }, "Toplam: ", React.createElement("b", null, fmtTRY(it.toplamTutar))),
+                        (it.tedarikci || it.odemeTarihi) && React.createElement("p", { className: "text-xs text-gray-600 mt-1" },
+                          it.tedarikci ? React.createElement(React.Fragment, null, "Tedarikçi: ", React.createElement("b", null, it.tedarikci), " · ") : null,
+                          it.odemeTarihi ? React.createElement(React.Fragment, null, "Ödeme: ", React.createElement("b", null, it.odemeTarihi)) : null
+                        ),
+                        it.not && React.createElement("p", { className: "text-xs text-gray-600 mt-1" }, "Not: ", it.not)
+                      ),
+                      React.createElement("div", { className: "flex items-center gap-2" },
+                        React.createElement("button", { onClick: () => onEdit(it), className: "px-3 py-1.5 rounded-xl border text-sm" }, "Düzenle"),
+                        React.createElement("button", { onClick: () => onDelete(it.id), className: "px-3 py-1.5 rounded-xl border text-sm" }, "Sil")
+                      )
+                    )
+                  ))
+                )
+          )
+        ),
+        React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200" },
+          React.createElement("div", { className: "max-w-3xl mx-auto px-4 py-2 flex items-center gap-2" },
+            React.createElement("button", { onClick: () => setStatusFilter("all"), className: \`flex-1 py-2 rounded-2xl border \${statusFilter === "all" ? "bg-gray-100" : ""}\` }, "Hepsi"),
+            React.createElement("button", { onClick: () => setStatusFilter("unpaid"), className: \`flex-1 py-2 rounded-2xl border \${statusFilter === "unpaid" ? "bg-gray-100" : ""}\` }, "Ödenmeyen"),
+            React.createElement("button", { onClick: () => setStatusFilter("paid"), className: \`flex-1 py-2 rounded-2xl border \${statusFilter === "paid" ? "bg-gray-100" : ""}\` }, "Ödenen"),
+            React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), className: "flex-1 py-2 rounded-2xl border" }, "Yeni Kayıt")
+          )
+        )
+      )
+    );
+  }
+
+  function Stat({ title, value }) {
+    return React.createElement("div", { className: "rounded-xl border p-3" },
+      React.createElement("p", { className: "text-xs text-gray-500" }, title),
+      React.createElement("p", { className: "text-lg font-semibold" }, value)
+    );
+  }
+
+  function safeCSV(s) {
+    if (s == null) return "";
+    const str = String(s);
+    if (str.includes(",") || str.includes('"') || str.includes("\\n")) {
+      return '"' + str.replaceAll('"', '""') + '"';
+    }
+    return str;
+  }
+  function unquote(s) {
+    const t = (s || "").trim();
+    if (t.startsWith('"') && t.endsWith('"')) return t.slice(1, -1).replaceAll('""', '"');
+    return t;
+  }
+  function splitCSV(line) {
+    const out = [];
+    let cur = "";
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') { q = false; }
+        else { cur += ch; }
+      } else {
+        if (ch === '"') q = true;
+        else if (ch === ',') { out.push(cur); cur = ""; }
+        else { cur += ch; }
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(React.createElement(App));
+  </script>
+</body>
+</html>
